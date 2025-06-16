@@ -53,9 +53,8 @@
   </style>
 </head>
 <body>
-  <button onclick="startRecognition()" style="margin: 10px auto; display: block; font-size: 1rem; padding: 8px 16px;">🎤 자막 시작</button>
-  <button onclick="clearOutput()" style="margin: 5px auto; display: block; font-size: 0.9rem; padding: 6px 14px;">🗑️ 자막 지우기</button>
-  <button onclick="startRecognition()" style="margin: 10px auto; display: block; font-size: 1rem; padding: 8px 16px;">🎤 자막 시작</button>
+  <button onclick="startRecognition()" style="margin: 10px auto; display: block; font-size: 1rem; padding: 8px 16px;">자막 시작</button>
+  <button onclick="clearOutput()" style="margin: 5px auto; display: block; font-size: 0.9rem; padding: 6px 14px;">자막 지우기</button>
   <div id="sliderContainer">
     자막 크기: <input type="range" id="fontSizeSlider" min="0.5" max="2.0" step="0.1" value="0.9">
   </div>
@@ -66,24 +65,17 @@
 let recognition;
 let timeoutId;
 let lastFinalTranscript = '';
-let recentTranscripts = []; // 중복 필터를 위한 최근 기록
+let recentTranscripts = [];
+
 function isSimilar(a, b) {
   if (!a || !b) return false;
   const minLen = Math.min(a.length, b.length);
   const same = a.slice(0, minLen) === b.slice(0, minLen);
   const ratio = minLen / Math.max(a.length, b.length);
-  return same && ratio > 0.8;"  // 이미 설정값이 0.8로 맞춰져 있습니다
-    }
-  ]
-}
+  return same && ratio > 0.8;
 }
 
 function startRecognition() {
-  const apiKey = new URLSearchParams(window.location.search).get('key') || prompt('OpenAI API Key 입력:');
-  const output = document.getElementById('output');
-  const loading = document.getElementById('loading');
-
-  if (!apiKey) return alert('API Key가 필요합니다.');
   if (!('webkitSpeechRecognition' in window)) {
     alert('이 브라우저는 음성 인식을 지원하지 않습니다.');
     return;
@@ -94,47 +86,58 @@ function startRecognition() {
   recognition.continuous = true;
   recognition.interimResults = true;
 
+  recognition.onstart = () => console.log('🎤 마이크 인식 시작됨');
+
+  recognition.onerror = (e) => {
+    console.error('🎤 오류:', e);
+    if (e.error === 'not-allowed') alert('브라우저에서 마이크 권한을 허용해주세요!');
+  };
+
+  recognition.onresult = handleRecognitionResult;
+  recognition.start();
+
+  const apiKey = new URLSearchParams(window.location.search).get('key') || prompt('OpenAI API Key 입력:');
+  if (!apiKey) return alert('API Key가 필요합니다.');
+  window._gptApiKey = apiKey;
+}
+
+function handleRecognitionResult(event) {
+  const apiKey = window._gptApiKey;
+  const output = document.getElementById('output');
+  const loading = document.getElementById('loading');
+
   let interimTranscript = '';
   let lastSpokenTime = Date.now();
 
-  recognition.onresult = function(event) {
-    
-    for (let i = event.resultIndex; i < event.results.length; ++i) {
-      const result = event.results[i];
-      let transcript = result[0].transcript.trim();
-      transcript = transcript.replace(/[.,!?\\s]+$/, '');
+  for (let i = event.resultIndex; i < event.results.length; ++i) {
+    const result = event.results[i];
+    let transcript = result[0].transcript.trim();
+    transcript = transcript.replace(/[.,!?\s]+$/, '');
 
-      const endsWithFinal = false;
-      
+    const endsWithFinal = false;
 
-      if ((result.isFinal || endsWithFinal) && transcript && transcript !== lastFinalTranscript && !recentTranscripts.some(t => isSimilar(t, transcript))) {
-        lastFinalTranscript = transcript;
-        handleFinalTranscript(transcript, apiKey, output, loading);
-        recentTranscripts.push(transcript);
-        if (recentTranscripts.length > 10) recentTranscripts.shift();
-      } else {
-        interimTranscript = transcript;
-        lastSpokenTime = Date.now();
-      }
+    if ((result.isFinal || endsWithFinal) && transcript && transcript !== lastFinalTranscript && !recentTranscripts.some(t => isSimilar(t, transcript))) {
+      lastFinalTranscript = transcript;
+      handleFinalTranscript(transcript, apiKey, output, loading);
+      recentTranscripts.push(transcript);
+      if (recentTranscripts.length > 10) recentTranscripts.shift();
+    } else {
+      interimTranscript = transcript;
+      lastSpokenTime = Date.now();
     }
+  }
 
-    clearTimeout(timeoutId);
-    timeoutId = setTimeout(() => {
-      if (interimTranscript && Date.now() - lastSpokenTime > 1200 && !recentTranscripts.some(t => isSimilar(t, interimTranscript))) {
-        lastFinalTranscript = interimTranscript;
-        handleFinalTranscript(interimTranscript, apiKey, output, loading);
-        recentTranscripts.push(interimTranscript);
-        if (recentTranscripts.length > 10) recentTranscripts.shift();
-        interimTranscript = '';
-      }
-    }, 1200);
-  };
-
-  recognition.onerror = (e) => console.error('🎤 오류:', e);
-  recognition.start();
+  clearTimeout(timeoutId);
+  timeoutId = setTimeout(() => {
+    if (interimTranscript && Date.now() - lastSpokenTime > 1200 && !recentTranscripts.some(t => isSimilar(t, interimTranscript))) {
+      lastFinalTranscript = interimTranscript;
+      handleFinalTranscript(interimTranscript, apiKey, output, loading);
+      recentTranscripts.push(interimTranscript);
+      if (recentTranscripts.length > 10) recentTranscripts.shift();
+      interimTranscript = '';
+    }
+  }, 1200);
 }
-
-// startRecognition(); // 사용자 클릭 시 실행
 
 document.getElementById('fontSizeSlider').addEventListener('input', function () {
   document.querySelector('.output').style.fontSize = this.value + 'rem';
@@ -181,6 +184,7 @@ async function translateText(text, langCode, apiKey) {
   const data = await response.json();
   return data.choices?.[0]?.message?.content || '(번역 실패)';
 }
+
 function clearOutput() {
   document.getElementById('output').innerHTML = '';
 }
