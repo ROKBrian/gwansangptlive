@@ -61,7 +61,25 @@
   <div id="loading">⏳ 번역 중...</div>
   <div class="output" id="output"></div>
 
-<script>
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getDatabase, ref, push } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+const firebaseConfig = {
+  apiKey: "",
+  authDomain: "gwansangptlive.firebaseapp.com",
+  databaseURL: "https://gwansangptlive-default-rtdb.firebaseio.com",
+  projectId: "gwansangptlive",
+  storageBucket: "gwansangptlive.appspot.com",
+  messagingSenderId: "",
+  appId: "",
+  measurementId: ""
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+const refOut = ref(db, 'subtitle');
+
 let recognition;
 let timeoutId;
 let lastFinalTranscript = '';
@@ -161,6 +179,13 @@ async function handleFinalTranscript(transcript, apiKey, output, loading) {
   koreanEntry.innerHTML = `<div>${transcript}</div>`;
   output.appendChild(koreanEntry);
   output.prepend(entry);
+
+  push(refOut, {
+    korean: transcript,
+    chinese,
+    russian,
+    timestamp: Date.now()
+  });
 
   loading.style.display = 'none';
   loading.classList.remove('animate');
