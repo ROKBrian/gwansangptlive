@@ -53,6 +53,9 @@
   </style>
 </head>
 <body>
+  <button onclick="startRecognition()" style="margin: 10px auto; display: block; font-size: 1rem; padding: 8px 16px;">🎤 자막 시작</button>
+  <button onclick="clearOutput()" style="margin: 5px auto; display: block; font-size: 0.9rem; padding: 6px 14px;">🗑️ 자막 지우기</button>
+  <button onclick="startRecognition()" style="margin: 10px auto; display: block; font-size: 1rem; padding: 8px 16px;">🎤 자막 시작</button>
   <div id="sliderContainer">
     자막 크기: <input type="range" id="fontSizeSlider" min="0.5" max="2.0" step="0.1" value="0.9">
   </div>
@@ -131,7 +134,7 @@ function startRecognition() {
   recognition.start();
 }
 
-startRecognition();
+// startRecognition(); // 사용자 클릭 시 실행
 
 document.getElementById('fontSizeSlider').addEventListener('input', function () {
   document.querySelector('.output').style.fontSize = this.value + 'rem';
@@ -177,6 +180,9 @@ async function translateText(text, langCode, apiKey) {
   });
   const data = await response.json();
   return data.choices?.[0]?.message?.content || '(번역 실패)';
+}
+function clearOutput() {
+  document.getElementById('output').innerHTML = '';
 }
 </script>
 </body>
