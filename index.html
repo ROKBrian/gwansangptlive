@@ -81,27 +81,30 @@
     }
 
     function startRecognition() {
-      if (!('webkitSpeechRecognition' in window)) {
-        alert('이 브라우저는 음성 인식을 지원하지 않습니다.');
-        return;
-      }
+  if (!('webkitSpeechRecognition' in window)) {
+    alert('이 브라우저는 음성 인식을 지원하지 않습니다.');
+    return;
+  }
 
-      recognition = new webkitSpeechRecognition();
-      recognition.lang = 'ko-KR';
-      recognition.continuous = true;
-      recognition.interimResults = true;
+  recognition = new webkitSpeechRecognition();
+  recognition.lang = 'ko-KR';
+  recognition.continuous = true;
+  recognition.interimResults = true;
 
-      recognition.onstart = () => console.log('🎤 마이크 인식 시작됨');
-      recognition.onerror = (e) => {
-        console.error('🎤 오류:', e);
-        if (e.error === 'not-allowed') alert('브라우저에서 마이크 권한을 허용해주세요!');
-      };
-      recognition.onresult = handleRecognitionResult;
-      recognition.start();
+  recognition.onstart = () => console.log('🎤 마이크 인식 시작됨');
+  recognition.onerror = (e) => {
+    console.error('🎤 오류:', e);
+    if (e.error === 'not-allowed') alert('브라우저에서 마이크 권한을 허용해주세요!');
+  };
+  recognition.onresult = handleRecognitionResult;
+  recognition.start();
 
-      const apiKey = new URLSearchParams(window.location.search).get('key') || prompt('OpenAI API Key 입력:');
-      if (!apiKey) return alert('API Key가 필요합니다.');
-      window._gptApiKey = apiKey;
+  setTimeout(() => {
+    const apiKey = new URLSearchParams(window.location.search).get('key') || prompt('OpenAI API Key 입력:');
+    if (!apiKey) return alert('API Key가 필요합니다.');
+    window._gptApiKey = apiKey;
+  }, 100);
+}
     }
 
     function handleRecognitionResult(event) {
