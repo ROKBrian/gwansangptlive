@@ -72,7 +72,7 @@ function isSimilar(a, b) {
   const minLen = Math.min(a.length, b.length);
   const same = a.slice(0, minLen) === b.slice(0, minLen);
   const ratio = minLen / Math.max(a.length, b.length);
-  return same && ratio > 0.8;
+  return same && ratio > 0.6;
 }
 
 function startRecognition() {
