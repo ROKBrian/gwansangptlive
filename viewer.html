@@ -54,7 +54,7 @@
     const output = document.getElementById('output');
 
     const connectedAt = Date.now();
-    subtitleRef.orderByChild('timestamp').startAt(connectedAt).on("child_added", snapshot => {
+    subtitleRef.on("child_added", snapshot => {
       const { korean, chinese, russian } = snapshot.val();
       const div = document.createElement('div');
       div.className = 'entry';
