@@ -34,27 +34,26 @@
 <body>
   <div id="output"></div>
 
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-    import { getDatabase, ref, onChildAdded } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
-
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+  <script>
     const firebaseConfig = {
-      apiKey: "",
+      apiKey: "AIzaSyDo2a59IDdOZC3guUzqZXX_XkCk9DzoyHo",
       authDomain: "gwansangptlive.firebaseapp.com",
-      databaseURL: "https://gwansangptlive-default-rtdb.firebaseio.com",
+      databaseURL: "https://gwansangptlive-default-rtdb.asia-southeast1.firebasedatabase.app",
       projectId: "gwansangptlive",
-      storageBucket: "gwansangptlive.appspot.com",
-      messagingSenderId: "",
-      appId: ""
+      storageBucket: "gwansangptlive.firebasestorage.app",
+      messagingSenderId: "417073178420",
+      appId: "1:417073178420:web:4ee059be2ff23784dce761"
     };
 
-    const app = initializeApp(firebaseConfig);
-    const db = getDatabase(app);
-    const subtitleRef = ref(db, 'subtitle');
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+    const subtitleRef = db.ref("subtitle");
 
     const output = document.getElementById('output');
 
-    onChildAdded(subtitleRef, snapshot => {
+    subtitleRef.limitToLast(100).on("child_added", (snapshot) => {
       const { korean, chinese, russian } = snapshot.val();
       const div = document.createElement('div');
       div.className = 'entry';
