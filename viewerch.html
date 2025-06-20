@@ -45,8 +45,11 @@
     const subtitleRef = db.ref("subtitle");
     const output = document.getElementById('output');
 
+    const viewerStartTime = Date.now(); // ✅ 현재 시각 저장
+
     subtitleRef.on("child_added", snapshot => {
-      const { chinese } = snapshot.val();
+      const { chinese, timestamp } = snapshot.val();
+      if (!timestamp || timestamp < viewerStartTime) return; // ✅ 접속 이후만 표시
       const div = document.createElement('div');
       div.className = 'entry';
       div.textContent = chinese;
