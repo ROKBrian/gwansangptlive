@@ -4,12 +4,52 @@
   <meta charset="UTF-8">
   <title>자막 송출기 (index.html)</title>
   <style>
-    body { background: #111; color: white; font-family: sans-serif; text-align: center; padding-top: 20px; }
+    body {
+      background: #111;
+      color: white;
+      font-family: sans-serif;
+      text-align: center;
+      padding-top: 20px;
+    }
+    button {
+      font-size: 1rem;
+      padding: 10px 20px;
+      margin: 10px;
+      background: #333;
+      color: white;
+      border: 1px solid #555;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    #output {
+      margin-top: 20px;
+      max-width: 90%;
+      margin-left: auto;
+      margin-right: auto;
+      text-align: left;
+      background: rgba(0, 0, 0, 0.6);
+      padding: 12px;
+      border-radius: 10px;
+      font-size: 1.2rem;
+      white-space: pre-wrap;
+    }
+    .entry {
+      margin-bottom: 0.6rem;
+      padding-bottom: 0.3rem;
+      border-bottom: 1px solid #444;
+    }
+    .entry:first-child {
+      font-size: 1.5rem;
+      font-weight: bold;
+      color: #00ffc3;
+    }
   </style>
 </head>
 <body>
-  <h2>🎤 실시간 자막 전송 중...</h2>
-  <button onclick="startRecognition()" style="font-size:1rem; padding:10px 20px;">시작</button>
+  <h2>🎤 실시간 자막 전송기</h2>
+  <button onclick="startRecognition()">자막 시작</button>
+  <button onclick="clearFirebase()">🧹 자막 전체 삭제</button>
+  <div id="output"></div>
 
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
@@ -27,6 +67,23 @@
 
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
+    const output = document.getElementById('output');
+
+    // 새로고침 시 subtitle 초기화
+    window.addEventListener('load', () => {
+      db.ref("subtitle").remove().then(() => {
+        console.log("📦 subtitle 노드 초기화 완료 (새로고침)");
+      });
+    });
+
+    // 수동 삭제 버튼
+    function clearFirebase() {
+      if (confirm("정말로 자막 데이터를 모두 삭제하시겠습니까?")) {
+        db.ref("subtitle").remove().then(() => {
+          alert("✅ 자막 데이터가 삭제되었습니다.");
+        });
+      }
+    }
 
     let recognition;
     let timeoutId;
@@ -65,6 +122,7 @@
         let transcript = result[0].transcript.trim().replace(/[.,!?]+$/, '');
 
         if (result.isFinal && transcript && !recentTranscripts.some(t => isSimilar(t, transcript))) {
+          displayText(transcript);
           handleFinalTranscript(transcript);
           recentTranscripts.push(transcript);
           if (recentTranscripts.length > 20) recentTranscripts.shift();
@@ -77,6 +135,7 @@
       clearTimeout(timeoutId);
       timeoutId = setTimeout(() => {
         if (interimTranscript && Date.now() - lastSpokenTime > 800 && !recentTranscripts.some(t => isSimilar(t, interimTranscript))) {
+          displayText(interimTranscript);
           handleFinalTranscript(interimTranscript);
           recentTranscripts.push(interimTranscript);
           if (recentTranscripts.length > 20) recentTranscripts.shift();
@@ -84,9 +143,15 @@
       }, 800);
     }
 
+    function displayText(text) {
+      const div = document.createElement('div');
+      div.className = 'entry';
+      div.textContent = text;
+      output.prepend(div);
+    }
+
     async function handleFinalTranscript(transcript) {
       const apiKey = window._gptApiKey;
-
       const [chinese, russian] = await Promise.all([
         translateText(transcript, 'zh', apiKey),
         translateText(transcript, 'ru', apiKey)
