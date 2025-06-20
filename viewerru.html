@@ -2,36 +2,84 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
-  <title>실시간 자막 (러시아어)</title>
+  <title>🌍 실시간 번역 보기 (러시아어)</title>
   <style>
     body {
-      background-color: #111;
-      color: white;
-      font-family: sans-serif;
       margin: 0;
       padding: 0;
+      background: #101010;
+      color: white;
+      font-family: 'Segoe UI', sans-serif;
     }
-    #controls {
+
+    header {
+      background: #1c1c1c;
       text-align: center;
-      margin: 10px 0;
+      padding: 20px;
+      border-bottom: 1px solid #333;
     }
+
+    header h1 {
+      margin: 0;
+      font-size: 1.6rem;
+      color: #00ffe0;
+    }
+
+    .controls {
+      text-align: center;
+      margin: 12px 0;
+    }
+
+    .controls label {
+      margin-right: 10px;
+      font-size: 0.9rem;
+      color: #ccc;
+    }
+
     #output {
-      max-width: 90%;
+      max-width: 800px;
       margin: 0 auto;
-      font-size: 1.2rem;
-      line-height: 1.6;
-      white-space: pre-wrap;
+      padding: 0 20px 40px;
     }
+
     .entry {
-      padding: 10px;
-      border-bottom: 1px solid #444;
+      background: #1a1a1a;
+      border-radius: 10px;
+      padding: 16px;
+      margin-top: 14px;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+      line-height: 1.6;
+      border-left: 4px solid #00ffd0;
+    }
+
+    .entry .kr {
+      font-size: 1rem;
+      color: #cccccc;
+      margin-top: 6px;
+    }
+
+    .entry .ru {
+      font-size: 1.15rem;
+      font-weight: bold;
+      color: #ffffff;
+    }
+
+    input[type="range"] {
+      width: 200px;
+      vertical-align: middle;
     }
   </style>
 </head>
 <body>
-  <div id="controls">
-    자막 크기: <input type="range" id="fontSizeSlider" min="0.5" max="2.5" step="0.1" value="1.2">
+  <header>
+    <h1>🌍 실시간 번역 보기 (러시아어)</h1>
+  </header>
+
+  <div class="controls">
+    <label for="fontSizeSlider">자막 크기:</label>
+    <input type="range" id="fontSizeSlider" min="0.5" max="2.5" step="0.1" value="1.2">
   </div>
+
   <div id="output"></div>
 
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
@@ -49,20 +97,20 @@
 
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
-    const output = document.getElementById('output');
+    const output = document.getElementById("output");
     const startTime = Date.now();
 
-    document.getElementById('fontSizeSlider').addEventListener('input', function () {
-      output.style.fontSize = this.value + 'rem';
+    document.getElementById("fontSizeSlider").addEventListener("input", function () {
+      output.style.fontSize = this.value + "rem";
     });
 
     db.ref("subtitle").on("child_added", snapshot => {
-      const { korean, russian, timestamp } = snapshot.val();
+      const { korean, russian = "", timestamp } = snapshot.val();
       if (!timestamp || timestamp < startTime) return;
 
-      const div = document.createElement('div');
-      div.className = 'entry';
-      div.innerHTML = `${russian || ''}<br>${korean}`;
+      const div = document.createElement("div");
+      div.className = "entry";
+      div.innerHTML = `<div class="ru">${russian}</div><div class="kr">${korean}</div>`;
       output.prepend(div);
     });
   </script>
