@@ -2,53 +2,85 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8">
-  <title>자막 송출기 (index.html)</title>
+  <title>AI 실시간 번역기</title>
   <style>
     body {
-      background: #111;
-      color: white;
-      font-family: sans-serif;
+      margin: 0;
+      padding: 0;
+      background: #101010;
+      font-family: 'Segoe UI', sans-serif;
+      color: #f0f0f0;
+    }
+
+    header {
+      padding: 20px;
       text-align: center;
-      padding-top: 20px;
+      background: #1c1c1c;
+      border-bottom: 1px solid #333;
     }
-    button {
-      font-size: 1rem;
-      padding: 10px 20px;
-      margin: 10px;
-      background: #333;
-      color: white;
-      border: 1px solid #555;
-      border-radius: 6px;
-      cursor: pointer;
+
+    header h1 {
+      margin: 0;
+      font-size: 1.8rem;
+      color: #00ffe0;
     }
-    #output {
+
+    .buttons {
+      display: flex;
+      justify-content: center;
+      gap: 12px;
       margin-top: 20px;
-      max-width: 90%;
-      margin-left: auto;
-      margin-right: auto;
-      text-align: left;
-      background: rgba(0, 0, 0, 0.6);
-      padding: 12px;
-      border-radius: 10px;
-      font-size: 1.2rem;
-      white-space: pre-wrap;
     }
+
+    button {
+      background-color: #222;
+      color: #fff;
+      border: 1px solid #444;
+      border-radius: 8px;
+      padding: 10px 20px;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    button:hover {
+      background-color: #333;
+    }
+
+    #output {
+      max-width: 800px;
+      margin: 30px auto 40px;
+      padding: 0 20px;
+    }
+
     .entry {
-      margin-bottom: 0.6rem;
-      padding-bottom: 0.3rem;
-      border-bottom: 1px solid #444;
+      background: #1a1a1a;
+      border: 1px solid #333;
+      border-radius: 10px;
+      padding: 14px;
+      margin-bottom: 12px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.3);
     }
+
     .entry:first-child {
-      font-size: 1.5rem;
+      background: #222;
+      border-color: #00ffd0;
+      font-size: 1.4rem;
       font-weight: bold;
-      color: #00ffc3;
+      color: #00ffd0;
     }
   </style>
 </head>
 <body>
-  <h2>🎤 실시간 자막 전송기</h2>
-  <button onclick="startRecognition()">자막 시작</button>
-  <button onclick="clearFirebase()">🧹 자막 전체 삭제</button>
+  <header>
+    <h1>🌐 AI 실시간 번역기 (교사용)</h1>
+  </header>
+
+  <div class="buttons">
+    <button onclick="startRecognition()">번역 시작</button>
+    <button onclick="clearFirebase()">🧹 데이터 초기화</button>
+  </div>
+
   <div id="output"></div>
 
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
@@ -72,15 +104,14 @@
     // 새로고침 시 subtitle 초기화
     window.addEventListener('load', () => {
       db.ref("subtitle").remove().then(() => {
-        console.log("📦 subtitle 노드 초기화 완료 (새로고침)");
+        console.log("📦 subtitle 노드 초기화 완료");
       });
     });
 
-    // 수동 삭제 버튼
     function clearFirebase() {
-      if (confirm("정말로 자막 데이터를 모두 삭제하시겠습니까?")) {
+      if (confirm("자막 데이터를 모두 삭제하시겠습니까?")) {
         db.ref("subtitle").remove().then(() => {
-          alert("✅ 자막 데이터가 삭제되었습니다.");
+          alert("✅ 데이터 삭제 완료");
         });
       }
     }
