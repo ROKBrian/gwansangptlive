@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Реальные субтитры (русский)</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: #111;
+      color: white;
+      font-family: sans-serif;
+    }
+    #output {
+      max-width: 90%;
+      margin: 20px auto;
+      font-size: 1.2rem;
+      line-height: 1.8;
+      white-space: pre-wrap;
+    }
+    .entry {
+      padding: 10px;
+      border-bottom: 1px solid #444;
+    }
+  </style>
+</head>
+<body>
+  <div id="output"></div>
+
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyDo2a59IDdOZC3guUzqZXX_XkCk9DzoyHo",
+      authDomain: "gwansangptlive.firebaseapp.com",
+      databaseURL: "https://gwansangptlive-default-rtdb.asia-southeast1.firebasedatabase.app",
+      projectId: "gwansangptlive",
+      storageBucket: "gwansangptlive.firebasestorage.app",
+      messagingSenderId: "417073178420",
+      appId: "1:417073178420:web:4ee059be2ff23784dce761"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+    const subtitleRef = db.ref("subtitle");
+    const output = document.getElementById('output');
+
+    subtitleRef.on("child_added", snapshot => {
+      const { russian } = snapshot.val();
+      const div = document.createElement('div');
+      div.className = 'entry';
+      div.textContent = russian;
+      output.appendChild(div);
+    });
+  </script>
+</body>
+</html>
