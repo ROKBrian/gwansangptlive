@@ -2,43 +2,18 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8">
-  <title>실시간 자막</title>
+  <title>자막 송출기 (index.html)</title>
   <style>
-    html, body {
-      margin: 0;
-      padding: 0;
-      background: #111;
-      font-family: sans-serif;
-      color: white;
-    }
-    #output {
-      font-size: 1.2rem;
-      white-space: pre-wrap;
-      text-align: left;
-      max-width: 90%;
-      margin: 10px auto;
-      background: rgba(0, 0, 0, 0.5);
-      padding: 10px;
-      border-radius: 10px;
-    }
-    .entry {
-      margin-bottom: 0.4rem;
-      border-bottom: 1px solid #444;
-      padding-bottom: 0.3rem;
-    }
-    .entry:first-child {
-      font-size: 1.6rem;
-      font-weight: bold;
-      color: #00ffcc;
-    }
+    body { background: #111; color: white; font-family: sans-serif; text-align: center; padding-top: 20px; }
   </style>
 </head>
 <body>
-  <button onclick="startRecognition()" style="margin: 10px auto; display: block; font-size: 1rem; padding: 8px 16px;">자막 시작</button>
-  <div id="output"></div>
+  <h2>🎤 실시간 자막 전송 중...</h2>
+  <button onclick="startRecognition()" style="font-size:1rem; padding:10px 20px;">시작</button>
 
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+
   <script>
     const firebaseConfig = {
       apiKey: "AIzaSyDo2a59IDdOZC3guUzqZXX_XkCk9DzoyHo",
@@ -63,23 +38,25 @@
       return a.includes(b) || b.includes(a) || a === b;
     }
 
-    function startRecognition() {
+    async function startRecognition() {
       if (!('webkitSpeechRecognition' in window)) {
         alert('이 브라우저는 음성 인식을 지원하지 않습니다.');
         return;
       }
 
+      const apiKey = new URLSearchParams(window.location.search).get('key') || prompt('OpenAI API Key 입력:');
+      if (!apiKey) return alert('API Key가 필요합니다.');
+      window._gptApiKey = apiKey;
+
       recognition = new webkitSpeechRecognition();
       recognition.lang = 'ko-KR';
       recognition.continuous = true;
       recognition.interimResults = true;
-
       recognition.onresult = handleRecognitionResult;
       recognition.start();
     }
 
     function handleRecognitionResult(event) {
-      const output = document.getElementById('output');
       let interimTranscript = '';
       let lastSpokenTime = Date.now();
 
@@ -88,19 +65,9 @@
         let transcript = result[0].transcript.trim().replace(/[.,!?]+$/, '');
 
         if (result.isFinal && transcript && !recentTranscripts.some(t => isSimilar(t, transcript))) {
-          lastFinalTranscript = transcript;
+          handleFinalTranscript(transcript);
           recentTranscripts.push(transcript);
           if (recentTranscripts.length > 20) recentTranscripts.shift();
-
-          const entry = document.createElement('div');
-          entry.className = 'entry';
-          entry.textContent = transcript;
-          output.prepend(entry);
-
-          db.ref('subtitle').push({
-            korean: transcript,
-            timestamp: Date.now()
-          });
         } else {
           interimTranscript = transcript;
           lastSpokenTime = Date.now();
@@ -110,21 +77,46 @@
       clearTimeout(timeoutId);
       timeoutId = setTimeout(() => {
         if (interimTranscript && Date.now() - lastSpokenTime > 800 && !recentTranscripts.some(t => isSimilar(t, interimTranscript))) {
-          lastFinalTranscript = interimTranscript;
+          handleFinalTranscript(interimTranscript);
           recentTranscripts.push(interimTranscript);
           if (recentTranscripts.length > 20) recentTranscripts.shift();
-
-          const entry = document.createElement('div');
-          entry.className = 'entry';
-          entry.textContent = interimTranscript;
-          output.prepend(entry);
-
-          db.ref('subtitle').push({
-            korean: interimTranscript,
-            timestamp: Date.now()
-          });
         }
       }, 800);
+    }
+
+    async function handleFinalTranscript(transcript) {
+      const apiKey = window._gptApiKey;
+
+      const [chinese, russian] = await Promise.all([
+        translateText(transcript, 'zh', apiKey),
+        translateText(transcript, 'ru', apiKey)
+      ]);
+
+      db.ref('subtitle').push({
+        korean: transcript,
+        chinese,
+        russian,
+        timestamp: Date.now()
+      });
+    }
+
+    async function translateText(text, langCode, apiKey) {
+      const res = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${apiKey}`
+        },
+        body: JSON.stringify({
+          model: "gpt-3.5-turbo",
+          messages: [
+            { role: "system", content: `Translate the following Korean sentence to ${langCode}. Only show the translated sentence.` },
+            { role: "user", content: text }
+          ]
+        })
+      });
+      const data = await res.json();
+      return data.choices?.[0]?.message?.content?.trim() || '';
     }
   </script>
 </body>
