@@ -1,86 +1,89 @@
 <!DOCTYPE html>
-<html lang="ko">
+<html lang="ru">
 <head>
   <meta charset="UTF-8">
-  <title>AI 실시간 번역기 (교사용)</title>
+  <title>🌍 실시간 번역 보기 (러시아어)</title>
   <style>
     body {
+      margin: 0;
+      padding: 0;
       background: #101010;
       color: white;
       font-family: 'Segoe UI', sans-serif;
-      text-align: center;
-      padding-top: 20px;
     }
 
     header {
       background: #1c1c1c;
-      padding: 20px 0;
+      text-align: center;
+      padding: 20px;
       border-bottom: 1px solid #333;
     }
 
     header h1 {
       margin: 0;
-      font-size: 1.8rem;
+      font-size: 1.6rem;
       color: #00ffe0;
     }
 
-    .buttons {
-      margin-top: 20px;
+    .controls {
+      text-align: center;
+      margin: 12px 0;
     }
 
-    button {
-      background-color: #222;
-      color: #fff;
-      border: 1px solid #444;
-      border-radius: 8px;
-      padding: 10px 20px;
-      font-size: 1rem;
-      margin: 8px;
-      cursor: pointer;
-    }
-
-    button:hover {
-      background-color: #333;
+    .controls label {
+      margin-right: 10px;
+      font-size: 0.9rem;
+      color: #ccc;
     }
 
     #output {
       max-width: 800px;
-      margin: 30px auto;
-      text-align: left;
-      padding: 0 20px;
+      margin: 0 auto;
+      padding: 0 20px 40px;
     }
 
     .entry {
       background: #1a1a1a;
-      border-left: 4px solid #00ffd0;
       border-radius: 10px;
-      padding: 14px;
-      margin-bottom: 12px;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+      padding: 16px;
+      margin-top: 14px;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+      line-height: 1.6;
+      border-left: 4px solid #00ffd0;
     }
 
-    .entry:first-child {
-      font-size: 1.4rem;
+    .entry .kr {
+      font-size: 1rem;
+      color: #cccccc;
+      margin-top: 6px;
+    }
+
+    .entry .ru {
+      font-size: 1.15rem;
       font-weight: bold;
-      color: #00ffd0;
+      color: #ffffff;
+    }
+
+    input[type="range"] {
+      width: 200px;
+      vertical-align: middle;
     }
   </style>
 </head>
 <body>
   <header>
-    <h1>🌐 AI 실시간 번역기 (교사용)</h1>
+    <h1>🌍 실시간 번역 보기 (러시아어)</h1>
   </header>
 
-  <div class="buttons">
-    <button onclick="startRecognition()">번역 시작</button>
-    <button onclick="clearFirebase()">🧹 데이터 초기화</button>
+  <div class="controls">
+    <label for="fontSizeSlider">자막 크기:</label>
+    <input type="range" id="fontSizeSlider" min="0.5" max="2.5" step="0.1" value="1.2">
   </div>
 
   <div id="output"></div>
 
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
-
   <script>
     const firebaseConfig = {
       apiKey: "AIzaSyDo2a59IDdOZC3guUzqZXX_XkCk9DzoyHo",
@@ -94,122 +97,22 @@
 
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
-    const output = document.getElementById('output');
+    const output = document.getElementById("output");
+    const startTime = Date.now();
 
-    // 새로고침 시 자동 초기화
-    window.addEventListener('load', () => {
-      db.ref("subtitle").remove().then(() => {
-        console.log("🔥 subtitle 초기화 완료");
-      });
+    document.getElementById("fontSizeSlider").addEventListener("input", function () {
+      output.style.fontSize = this.value + "rem";
     });
 
-    // 수동 초기화 버튼
-    function clearFirebase() {
-      if (confirm("자막 데이터를 모두 삭제하시겠습니까?")) {
-        db.ref("subtitle").remove().then(() => {
-          output.innerHTML = ''; // ✅ 자막 화면도 초기화
-          alert("✅ 데이터 및 화면 초기화 완료");
-        });
-      }
-    }
+    db.ref("subtitle").on("child_added", snapshot => {
+      const { korean, russian = "", timestamp } = snapshot.val();
+      if (!timestamp || timestamp < startTime) return;
 
-    let recognition;
-    let timeoutId;
-    let recentTranscripts = [];
-
-    function isSimilar(a, b) {
-      if (!a || !b) return false;
-      const cleanA = a.replace(/\s/g, '').slice(0, 20);
-      const cleanB = b.replace(/\s/g, '').slice(0, 20);
-      return cleanA === cleanB;
-    }
-
-    async function startRecognition() {
-      if (!('webkitSpeechRecognition' in window)) {
-        alert('이 브라우저는 음성 인식을 지원하지 않습니다.');
-        return;
-      }
-
-      const apiKey = new URLSearchParams(window.location.search).get('key') || prompt('OpenAI API Key 입력:');
-      if (!apiKey) return alert('API Key가 필요합니다.');
-      window._gptApiKey = apiKey;
-
-      recognition = new webkitSpeechRecognition();
-      recognition.lang = 'ko-KR';
-      recognition.continuous = true;
-      recognition.interimResults = true;
-      recognition.onresult = handleRecognitionResult;
-      recognition.start();
-    }
-
-    function handleRecognitionResult(event) {
-      let interimTranscript = '';
-      let lastSpokenTime = Date.now();
-
-      for (let i = event.resultIndex; i < event.results.length; ++i) {
-        const result = event.results[i];
-        let transcript = result[0].transcript.trim().replace(/[.,!?]+$/, '');
-
-        if (result.isFinal && transcript && !recentTranscripts.some(t => isSimilar(t, transcript))) {
-          handleFinalTranscript(transcript);
-          displayText(transcript);
-          recentTranscripts.push(transcript);
-        } else {
-          interimTranscript = transcript;
-          lastSpokenTime = Date.now();
-        }
-      }
-
-      clearTimeout(timeoutId);
-      timeoutId = setTimeout(() => {
-        if (interimTranscript && Date.now() - lastSpokenTime > 800 && !recentTranscripts.some(t => isSimilar(t, interimTranscript))) {
-          handleFinalTranscript(interimTranscript);
-          displayText(interimTranscript);
-          recentTranscripts.push(interimTranscript);
-        }
-      }, 800);
-    }
-
-    function displayText(text) {
-      const div = document.createElement('div');
-      div.className = 'entry';
-      div.textContent = text;
+      const div = document.createElement("div");
+      div.className = "entry";
+      div.innerHTML = `<div class="ru">${russian}</div><div class="kr">${korean}</div>`;
       output.prepend(div);
-    }
-
-    async function handleFinalTranscript(transcript) {
-      const apiKey = window._gptApiKey;
-      const [chinese, russian] = await Promise.all([
-        translateText(transcript, 'zh', apiKey),
-        translateText(transcript, 'ru', apiKey)
-      ]);
-
-      db.ref('subtitle').push({
-        korean: transcript,
-        chinese,
-        russian,
-        timestamp: Date.now()
-      });
-    }
-
-    async function translateText(text, langCode, apiKey) {
-      const res = await fetch("https://api.openai.com/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${apiKey}`
-        },
-        body: JSON.stringify({
-          model: "gpt-3.5-turbo",
-          messages: [
-            { role: "system", content: `Translate the following Korean sentence to ${langCode}. Only show the translated sentence.` },
-            { role: "user", content: text }
-          ]
-        })
-      });
-      const data = await res.json();
-      return data.choices?.[0]?.message?.content?.trim() || '';
-    }
+    });
   </script>
 </body>
 </html>
