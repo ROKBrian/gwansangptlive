@@ -24,6 +24,13 @@
       font-size: 1.8rem;
       color: #00ffe0;
     }
+    
+    /* 버전 기록 스타일 추가 */
+    header p {
+      margin-top: 5px;
+      font-size: 0.9rem;
+      color: #aaa;
+    }
 
     .buttons {
       display: flex;
@@ -74,6 +81,9 @@
 <body>
   <header>
     <h1>🌐 AI 실시간 번역기 (교사용)</h1>
+    <p>
+      **Ver 2.1 (2025.10.16)**: 🎙️ 인식 연속성 대폭 강화 (onend, onerror 즉시 재시작 로직 적용)
+    </p>
   </header>
 
   <div class="buttons">
@@ -143,15 +153,13 @@
         }
     }
 
-    // ⭐ 재시작 로직을 분리하여 안정성을 높입니다.
+    // 재시작 로직을 분리하여 안정성을 높입니다.
     function restartRecognition() {
-      // recognition 객체가 초기화되었고, 사용자가 인식을 시작한 상태일 때만 재시작합니다.
       if (recognition && isRecognitionActive) { 
         console.log("Speech Recognition is restarting in 100ms...");
         try {
           recognition.start();
         } catch (e) {
-          // 'InvalidStateError'는 이미 시작된 상태일 때 발생할 수 있습니다. 
           if (e.name !== 'InvalidStateError') {
              console.error("Failed to start recognition, retrying in 500ms:", e);
              setTimeout(restartRecognition, 500);
@@ -186,13 +194,13 @@
       
       recognition.onend = () => {
         console.log("Speech Recognition Ended. Auto-restarting...");
-        // ⭐ 인식이 멈출 때마다 짧은 딜레이 후 재시작하여 갭을 최소화합니다.
+        // 인식이 멈출 때마다 짧은 딜레이(100ms) 후 재시작하여 갭을 최소화합니다.
         setTimeout(restartRecognition, 100); 
       };
 
       recognition.onerror = (event) => {
         console.error("Speech Recognition Error:", event.error);
-        // ⭐ 에러 발생 시에도 재시작하여 끊김을 방지합니다.
+        // 에러 발생 시에도 재시작하여 끊김을 방지합니다.
         if (event.error !== 'no-speech' && isRecognitionActive) {
             setTimeout(restartRecognition, 500); 
         }
@@ -208,7 +216,7 @@
 
     function handleRecognitionResult(event) {
       clearTimeout(timeoutId);
-      let isFinalResultProcessed = false; // 최종 결과 처리 여부 플래그
+      let isFinalResultProcessed = false; 
 
       for (let i = event.resultIndex; i < event.results.length; ++i) {
         const result = event.results[i];
@@ -217,15 +225,13 @@
         if (result.isFinal) {
           processTranscript(transcript);
           isFinalResultProcessed = true;
-          interimTranscript = ''; // 최종 결과 처리 후 임시 발화는 리셋
+          interimTranscript = '';
         } else {
           interimTranscript = transcript;
         }
       }
       
-      // 최종 결과가 처리되지 않았고, 임시 발화가 있는 경우에만 타이머 재설정
       if (interimTranscript && !isFinalResultProcessed) {
-        // 말이 완전히 끝났는지 확인하는 타이머 설정 (800ms)
         timeoutId = setTimeout(() => {
           processTranscript(interimTranscript);
           interimTranscript = '';
@@ -285,3 +291,15 @@
         if (!res.ok) {
             const errorData = await res.json();
             throw new Error(`OpenAI API Error: ${res.status} - ${errorData.error.message}`);
+        }
+        
+        const data = await res.json();
+        return data.choices?.[0]?.message?.content?.trim() || '번역 실패';
+      } catch (error) {
+          console.error(`Error translating to ${langCode}:`, error);
+          return `번역 오류: ${error.message}`;
+      }
+    }
+  </script>
+</body>
+</html>
