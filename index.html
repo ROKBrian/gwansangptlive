@@ -87,7 +87,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
 
   <script>
-    // Firebase 설정
+    // Firebase 설정 (이전과 동일)
     const firebaseConfig = {
       apiKey: "AIzaSyDo2a59IDdOZC3guUzqZXX_XkCk9DzoyHo",
       authDomain: "gwansangptlive.firebaseapp.com",
@@ -102,7 +102,6 @@
     const db = firebase.database();
     const output = document.getElementById('output');
 
-    // 새로고침 시 subtitle 초기화
     window.addEventListener('load', () => {
       db.ref("subtitle").remove().then(() => {
         console.log("📦 subtitle 노드 초기화 완료");
@@ -113,7 +112,6 @@
       if (confirm("자막 데이터를 모두 삭제하시겠습니까?")) {
         db.ref("subtitle").remove().then(() => {
           alert("✅ 데이터 삭제 완료");
-          // 화면의 자막도 지우기
           output.innerHTML = ''; 
         });
       }
@@ -121,34 +119,45 @@
 
     let recognition;
     let timeoutId;
-    let interimTranscript = ''; // 현재 처리 중인 임시 발화
-    let recentTranscripts = []; // 중복 방지를 위한 최근 발화 기록
+    let interimTranscript = '';
+    let recentTranscripts = [];
+    let isRecognitionActive = false; // 현재 인식 상태 플래그
 
-    // 두 발화가 유사한지 확인하는 함수
     function isSimilar(a, b) {
       if (!a || !b) return false;
       const tA = a.toLowerCase().trim();
       const tB = b.toLowerCase().trim();
-      // 한쪽이 다른 쪽을 포함하거나 완전히 같으면 유사하다고 판단
       return tA.includes(tB) || tB.includes(tA) || tA === tB;
     }
     
-    // 발화를 처리하고 중복을 방지하는 함수
     function processTranscript(transcript) {
         if (!transcript) return;
-
-        // 마침표나 쉼표 등을 제거하고 공백을 정리
         const cleanTranscript = transcript.trim().replace(/[.,!?]+$/, '');
 
-        // 최근 기록에 유사한 발화가 없는 경우에만 처리
         if (cleanTranscript && !recentTranscripts.some(t => isSimilar(t, cleanTranscript))) {
             displayText(cleanTranscript);
             handleFinalTranscript(cleanTranscript);
             
-            // 발화 기록에 추가하고, 너무 많은 기록을 방지하기 위해 오래된 기록 제거
             recentTranscripts.push(cleanTranscript);
             if (recentTranscripts.length > 20) recentTranscripts.shift();
         }
+    }
+
+    // ⭐ 재시작 로직을 분리하여 안정성을 높입니다.
+    function restartRecognition() {
+      // recognition 객체가 초기화되었고, 사용자가 인식을 시작한 상태일 때만 재시작합니다.
+      if (recognition && isRecognitionActive) { 
+        console.log("Speech Recognition is restarting in 100ms...");
+        try {
+          recognition.start();
+        } catch (e) {
+          // 'InvalidStateError'는 이미 시작된 상태일 때 발생할 수 있습니다. 
+          if (e.name !== 'InvalidStateError') {
+             console.error("Failed to start recognition, retrying in 500ms:", e);
+             setTimeout(restartRecognition, 500);
+          }
+        }
+      }
     }
 
 
@@ -158,98 +167,96 @@
         return;
       }
 
-      // API Key 요청 및 저장 (기존 로직 유지)
       const apiKey = new URLSearchParams(window.location.search).get('key') || prompt('OpenAI API Key 입력:');
       if (!apiKey) return alert('API Key가 필요합니다.');
       window._gptApiKey = apiKey;
       
-      // 기존 인식이 실행 중이라면 중지
       if (recognition) {
         recognition.stop();
       }
+      
+      isRecognitionActive = true; // 인식 활성화 상태로 설정
 
       recognition = new webkitSpeechRecognition();
-      recognition.lang = 'ko-KR'; // 한국어 설정
-      recognition.continuous = true; // 계속 인식
-      recognition.interimResults = true; // 임시 결과 제공
+      recognition.lang = 'ko-KR';
+      recognition.continuous = true;
+      recognition.interimResults = true;
 
       recognition.onresult = handleRecognitionResult;
+      
+      recognition.onend = () => {
+        console.log("Speech Recognition Ended. Auto-restarting...");
+        // ⭐ 인식이 멈출 때마다 짧은 딜레이 후 재시작하여 갭을 최소화합니다.
+        setTimeout(restartRecognition, 100); 
+      };
+
       recognition.onerror = (event) => {
         console.error("Speech Recognition Error:", event.error);
-      };
-      recognition.onend = () => {
-        // 인식이 끝났을 때 다시 시작 (continuous 설정이 있지만, 브라우저 정책상 멈출 수 있음)
-        console.log("Speech Recognition Ended. Restarting...");
-        // recognition.start(); // 무한 재시작은 불안정할 수 있어 일단 주석 처리
+        // ⭐ 에러 발생 시에도 재시작하여 끊김을 방지합니다.
+        if (event.error !== 'no-speech' && isRecognitionActive) {
+            setTimeout(restartRecognition, 500); 
+        }
       };
       
       try {
         recognition.start();
+        console.log("Speech Recognition Started.");
       } catch(e) {
-        console.error("Recognition start failed:", e);
+        console.error("Recognition initial start failed:", e);
       }
     }
 
     function handleRecognitionResult(event) {
-      clearTimeout(timeoutId); // 새 결과가 들어오면 타이머 초기화
-      interimTranscript = ''; // 현재 세션의 임시 발화 초기화
+      clearTimeout(timeoutId);
+      let isFinalResultProcessed = false; // 최종 결과 처리 여부 플래그
 
       for (let i = event.resultIndex; i < event.results.length; ++i) {
         const result = event.results[i];
         let transcript = result[0].transcript.trim();
 
         if (result.isFinal) {
-          // 1. 최종 발화가 확정된 경우 바로 처리
           processTranscript(transcript);
+          isFinalResultProcessed = true;
+          interimTranscript = ''; // 최종 결과 처리 후 임시 발화는 리셋
         } else {
-          // 2. 임시 발화가 있는 경우 저장
           interimTranscript = transcript;
         }
       }
-
-      // 발화가 완전히 끝났는지 확인하는 타이머 설정 (800ms)
-      // 최종 발화가 아니더라도 800ms 동안 말이 없으면 현재 임시 발화를 최종으로 간주하고 처리
-      if (interimTranscript) {
+      
+      // 최종 결과가 처리되지 않았고, 임시 발화가 있는 경우에만 타이머 재설정
+      if (interimTranscript && !isFinalResultProcessed) {
+        // 말이 완전히 끝났는지 확인하는 타이머 설정 (800ms)
         timeoutId = setTimeout(() => {
-          // 800ms 후에도 새로운 음성 입력이 없었다면, 이 임시 발화를 최종으로 처리
           processTranscript(interimTranscript);
-          interimTranscript = ''; // 처리했으니 비움
+          interimTranscript = '';
         }, 800);
       }
     }
 
-    // 화면에 발화를 표시하는 함수
     function displayText(text) {
       const div = document.createElement('div');
       div.className = 'entry';
       div.textContent = text;
       
-      // 첫 번째 항목은 스타일이 다르므로 제거하고 새로 추가
       if (output.firstChild) {
          output.firstChild.className = 'entry';
       }
 
-      // 가장 최근 발화를 첫 번째 항목으로 설정
-      div.className = 'entry';
       output.prepend(div);
       
-      // 가장 위에 있는 항목을 강조
       if (output.firstChild) {
-        output.firstChild.className = 'entry entry-highlight'; // CSS에 없는 클래스지만, 기존 로직상 :first-child가 작동하므로 괜찮음
+        output.firstChild.className = 'entry entry-highlight';
       }
     }
 
-    // 번역 및 Firebase에 저장하는 함수
     async function handleFinalTranscript(transcript) {
       const apiKey = window._gptApiKey;
       
-      // 병렬로 번역 요청 (중국어, 러시아어)
       const [chinese, russian] = await Promise.all([
         translateText(transcript, 'zh', apiKey),
         translateText(transcript, 'ru', apiKey)
       ]);
 
-      // Firebase에 데이터 저장
       db.ref('subtitle').push({
         korean: transcript,
         chinese,
@@ -258,7 +265,6 @@
       });
     }
 
-    // OpenAI를 이용한 번역 함수
     async function translateText(text, langCode, apiKey) {
       try {
         const res = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -272,24 +278,10 @@
             messages: [
               { role: "system", content: `Translate the following Korean sentence to ${langCode}. Only show the translated sentence and do not include any extra text, comments, or explanations.` },
               { role: "user", content: text }
-            ],
-            // 낮은 latency를 위해 stream을 사용할 수도 있지만, 현재는 기본 요청으로 유지
-            // max_tokens, temperature 등의 설정을 통해 번역 품질을 조절할 수 있습니다.
+            ]
           })
         });
 
         if (!res.ok) {
             const errorData = await res.json();
             throw new Error(`OpenAI API Error: ${res.status} - ${errorData.error.message}`);
-        }
-        
-        const data = await res.json();
-        return data.choices?.[0]?.message?.content?.trim() || '번역 실패';
-      } catch (error) {
-          console.error(`Error translating to ${langCode}:`, error);
-          return `번역 오류: ${error.message}`;
-      }
-    }
-  </script>
-</body>
-</html>
